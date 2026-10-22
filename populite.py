@@ -32,6 +32,22 @@ import numpy as np
 # Input parsing
 # ----------------------------------------------------------------------------
 
+def read_chroms_file(path):
+    """Read chromosome names, ignoring blank lines and full-line comments."""
+    names = []
+    with open(path, encoding="utf-8") as fh:
+        for lineno, line in enumerate(fh, start=1):
+            name = line.strip()
+            if not name or name.startswith("#"):
+                continue
+            if len(name.split()) != 1 or "," in name:
+                raise ValueError(
+                    f"{path}:{lineno}: expected one chromosome name per row"
+                )
+            names.append(name)
+    return names
+
+
 def read_two_col(path):
     """Read a two-column whitespace-separated file into an ordered list of pairs."""
     pairs = []
@@ -329,19 +345,56 @@ def fmt(x):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--vcf", required=True, help="SNP VCF/BCF (bgzipped + indexed)")
-    ap.add_argument("--masks", required=True, help="TSV: sample<TAB>mask.bed (callable regions)")
-    ap.add_argument("--pops", required=True, help="TSV: sample<TAB>population")
-    ap.add_argument("--window-size", type=int, default=100_000, help="window size in bp [100000]")
-    ap.add_argument("--chroms", help="comma-separated chromosomes to analyse [all]")
-    ap.add_argument("--ploidy", type=int, default=2, help="ploidy assumed for all samples [2]")
-    ap.add_argument("--chunk-size", type=int, default=50_000, help="variant sites per processing chunk")
+    ap.add_argument("--vcf", required=True,
+                    help="SNP VCF/BCF (bgzipped + indexed)")
+    ap.add_argument("--masks", required=True,
+                    help="TSV: sample<TAB>mask.bed (callable regions)")
+    ap.add_argument("--pops", required=True,
+                    help="TSV: sample<TAB>population")
+    ap.add_argument("--window-size", type=int, default=100_000,
+                    help="window size in bp [100000]")
+    chrom_group = ap.add_mutually_exclusive_group()
+    chrom_group.add_argument("--chroms", metavar="CHROM[,CHROM...]",
+        help=(
+            "Comma-separated chromosomes to analyse "
+            "[default: all chromosomes represented in masks]"
+        ),
+    )
+    chrom_group.add_argument("--chroms-file", metavar="FILE",
+        help=(
+            "File with one chromosome name per row "
+            "(blank lines and full-line # comments ignored)"
+        ),
+    )
+    ap.add_argument("--ploidy", type=int, default=2,
+                    help="ploidy assumed for all samples [2]")
+    ap.add_argument("--chunk-size", type=int, default=50_000,
+                    help="variant sites per processing chunk")
     ap.add_argument("--stats", nargs="+",
                     choices=["pi", "het", "dxy", "fst", "watterson_theta", "tajima_d"],
                     default=["pi", "het"],
                     help="statistics to estimate [pi het]")
-    ap.add_argument("--out", required=True, help="output prefix")
+    ap.add_argument("--out", required=True,
+                    help="output prefix")
     args = ap.parse_args()
+
+    selected_chroms = None
+    try:
+        if args.chroms is not None:
+            selected_chroms = [name.strip() for name in args.chroms.split(",")]
+        elif args.chroms_file is not None:
+            selected_chroms = read_chroms_file(args.chroms_file)
+    except (OSError, UnicodeError, ValueError) as exc:
+        ap.error(f"--chroms-file: {exc}")
+
+    if selected_chroms is not None:
+        if not selected_chroms or any(
+            not name or any(char.isspace() for char in name)
+            for name in selected_chroms
+        ):
+            ap.error("chromosome selection must contain nonempty names "
+                     "without whitespace")
+        selected_chroms = list(dict.fromkeys(selected_chroms))
 
     W, P = args.window_size, args.ploidy
     stats = set(args.stats)
@@ -383,8 +436,8 @@ def main():
     for c in mask_chroms:
         if chrom_len.get(c) is None:
             chrom_len[c] = int(max(m[c][1][-1] for m in masks if c in m and len(m[c][1])))
-    if args.chroms:
-        chroms = args.chroms.split(",")
+    if selected_chroms is not None:
+        chroms = selected_chroms
     else:
         order = list(vcf_contigs) + [c for c in mask_chroms if c not in vcf_contigs]
         chroms = [c for c in order if c in set(mask_chroms)]
