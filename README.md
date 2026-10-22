@@ -70,6 +70,7 @@ cd examples
 | `--stats STAT [STAT ...]` | No | `pi het` | Space-separated statistics to estimate: `pi`, `het`, `dxy`, `fst`, `watterson_theta`, and/or `tajima_d`. By default only `pi` and `het` are calculated. `dxy` and `fst` require at least two populations. WC `fst` requires diploid genotypes. |
 | `--window-size BP` | No | `100000` | Window width in base pairs. The final window on a chromosome may be shorter. |
 | `--chroms CHROM[,CHROM...]` | No | All chromosomes with mask data | Comma-separated chromosome or contig names to analyze, for example `chr1,chr2`. Names must match the VCF and BED files. |
+| `--chroms-file PATH` | No | None | File with one chromosome name per row (blank lines and full-line # comments ignored). |
 | `--ploidy N` | No | `2` | Ploidy assumed for every sample and chromosome. WC `fst` is currently supported only with `2`. |
 | `--chunk-size N` | No | `50000` | Maximum number of variant records queried at once. Smaller values use less temporary memory; larger values may reduce processing overhead. |
 
