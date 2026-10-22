@@ -10,7 +10,7 @@ Populite estimates unbiased estimates of several commonly used population geneti
 ### Manage dependencies with conda:
 
 ```bash
-git clone XXX
+git clone https://github.com/axeljen/populite
 cd populite
 # make main script executable
 chmod +x populite.py
